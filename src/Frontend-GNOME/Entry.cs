@@ -46,7 +46,8 @@ namespace Smuxi.Frontend.Gnome
         private bool             _HistoryChangedLine;
         private Notebook         _Notebook;
         private CommandManager   _CommandManager;
-        
+        private NickCompleter    _NickCompleter = null;
+
         /*
         public StringCollection History {
             get {
@@ -332,7 +333,7 @@ namespace Smuxi.Frontend.Gnome
                         _Notebook.CurrentChatView.HasFocus = true;
                     } else {
                         if (Text.Length > 0) {
-                            _NickCompletion();
+                            _NickCompletion(ref _NickCompleter);
                         }
                     }
                     break;
@@ -353,6 +354,10 @@ namespace Smuxi.Frontend.Gnome
                     break;
                 case Gdk.Key.Page_Down:
                     _Notebook.CurrentChatView.ScrollDown();
+                    break;
+                default:
+                    // invalidate the nickcompleter
+                    _NickCompleter = null;
                     break;
             }
         }
@@ -641,150 +646,18 @@ namespace Smuxi.Frontend.Gnome
             _Notebook.CurrentChatView.Clear();
         }
 
-        private void _NickCompletion()
+        private void _NickCompletion(ref NickCompleter _NickCompleter)
         {
-            // return if we don't support the current ChatView
-            if (!(_Notebook.CurrentChatView is GroupChatView) &&
-                !(_Notebook.CurrentChatView is PersonChatView)) {
-                return;
+            if (_NickCompleter == null) {
+                _NickCompleter = new NickCompleter(_Notebook.CurrentChatView,
+                                                   Frontend.UserConfig, Text, Position);
             }
 
-            int position = CursorPosition;
-            string text = Text;
-            string word;
-            int previous_space;
-            int next_space;
-
-            // find the current word
-            string temp;
-            temp = text.Substring(0, position);
-            previous_space = temp.LastIndexOf(' ');
-            next_space = text.IndexOf(' ', position);
-
-#if LOG4NET
-            _Logger.Debug("previous_space: "+previous_space);
-            _Logger.Debug("next_space: "+next_space);
-#endif
-
-            if (previous_space != -1 && next_space != -1) {
-                // previous and next space exist
-                word = text.Substring(previous_space + 1, next_space - previous_space - 1);
-            } else if (previous_space != -1) {
-                // previous space exist
-                word = text.Substring(previous_space + 1);
-            } else if (next_space != -1) {
-                // next space exist
-                word = text.Substring(0, next_space);
-            } else {
-                // no spaces
-                word = text;
-            }
-
-            if (word == String.Empty) {
-                return;
-            }
-
-            bool leadingAt = false;
-            // remove leading @ character
-            if (word.StartsWith("@")) {
-                word = word.Substring(1);
-                leadingAt = true;
-            }
-
-            // find the possible nickname
-            bool found = false;
-            bool partial_found = false;
-            string nick = null;
-
-            ChatModel chat = _Notebook.CurrentChatView.ChatModel;
-            if (chat.ChatType == ChatType.Group) {
-                GroupChatModel cp = (GroupChatModel) chat;
-                if ((bool)Frontend.UserConfig["Interface/Entry/BashStyleCompletion"]) {
-                    IList<string> result = cp.PersonLookupAll(word);
-                    if (result == null || result.Count == 0) {
-                        // no match
-                    } else if (result.Count == 1) {
-                        found = true;
-                        nick = result[0];
-                    } else if (result.Count >= 2) {
-                        string[] nickArray = new string[result.Count];
-                        result.CopyTo(nickArray, 0);
-                        string nicks = String.Join(" ", nickArray, 1, nickArray.Length - 1);
-                        _Notebook.CurrentChatView.AddMessage(
-                            new MessageModel(String.Format("-!- {0}", nicks))
-                        );
-                        found = true;
-                        partial_found = true;
-                        nick = result[0];
-                    }
-                } else {
-                    PersonModel person = cp.PersonLookup(word);
-                    if (person != null) {
-                        found = true;
-                        nick = person.IdentityName;
-                     }
-                }
-            } else {
-                PersonChatModel cp = (PersonChatModel) chat;
-                PersonModel person = cp.Person;
-
-                if (person.IdentityName.StartsWith(word, StringComparison.InvariantCultureIgnoreCase)) {
-                    found = true;
-                    nick = cp.Person.IdentityName;
-                }
-            }
-
-            string completionChar = (string)
-                Frontend.UserConfig["Interface/Entry/CompletionCharacter"];
-            // add leading @ back and supress completion character
-            if (leadingAt) {
-                word = String.Format("@{0}", word);
-                nick = String.Format("@{0}", nick);
-                completionChar = String.Empty;
-            }
-
-            if (found) {
-                // put the found nickname in place
-                if (previous_space != -1 && next_space != -1) {
-                    // previous and next space exist
-                    temp = text.Remove(previous_space + 1, word.Length);
-                    temp = temp.Insert(previous_space + 1, nick);
-                    Text = temp;
-                    if (partial_found) {
-                        Position = previous_space + 1 + nick.Length;
-                    } else {
-                        Position = previous_space + 2 + nick.Length;
-                    }
-                } else if (previous_space != -1) {
-                    // only previous space exist
-                    temp = text.Remove(previous_space + 1, word.Length);
-                    temp = temp.Insert(previous_space + 1, nick);
-                    if (partial_found) {
-                        Text = temp;
-                    } else {
-                        Text = temp + " ";
-                    }
-                    Position = previous_space + 2 + nick.Length;
-                } else if (next_space != -1) {
-                    // only next space exist
-                    temp = text.Remove(0, next_space + 1);
-                    if (partial_found) {
-                        Text = nick + " " + temp;
-                        Position = nick.Length;
-                    } else {
-                        Text = String.Format("{0}{1} {2}", nick,
-                                             completionChar, temp);
-                        Position = nick.Length + completionChar.Length + 1;
-                    }
-                } else {
-                    // no spaces
-                    if (partial_found) {
-                        Text = nick;
-                    } else {
-                        Text = String.Format("{0}{1} ", nick, completionChar);
-                    }
-                    Position = -1;
-                }
+            int newPosition;
+            string text = _NickCompleter.Next(out newPosition);
+            if (text != null) {
+                Text = text;
+                Position = newPosition;
             }
         }
         

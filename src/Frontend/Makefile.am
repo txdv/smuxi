@@ -69,7 +69,8 @@ FILES = \
 	IEntryView.cs \
 	EngineManager.cs \
 	SshTunnelManager.cs \
-	CommandManager.cs
+	CommandManager.cs \
+	NickCompleter.cs
 
 DATA_FILES = 
 

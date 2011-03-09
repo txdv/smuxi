@@ -61,6 +61,30 @@ namespace Smuxi.Engine
             }
         }
         
+        public bool HasHighlight {
+            get {
+                foreach (MessagePartModel msp in MessageParts) {
+                    if (msp.IsHighlight) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+
+        public ICollection<MessagePartModel> HighlightedMessageParts
+        {
+            get {
+                List<MessagePartModel> list = new List<MessagePartModel>();
+                foreach (MessagePartModel msp in MessageParts) {
+                    if (msp.IsHighlight) {
+                        list.Add(msp);
+                    }
+                }
+                return list;
+            }
+        }
+
         public MessageModel()
         {
             f_TimeStamp    = DateTime.UtcNow;

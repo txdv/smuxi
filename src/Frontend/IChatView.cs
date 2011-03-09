@@ -44,5 +44,7 @@ namespace Smuxi.Frontend
         void ScrollDown();
         void ScrollToStart();
         void ScrollToEnd();
+
+        void AddMessage(MessageModel message);
     }
 }
