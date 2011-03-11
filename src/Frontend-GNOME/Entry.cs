@@ -651,6 +651,11 @@ namespace Smuxi.Frontend.Gnome
             if (_NickCompleter == null) {
                 _NickCompleter = new NickCompleter(_Notebook.CurrentChatView,
                                                    Frontend.UserConfig, Text, Position);
+
+                if (!_NickCompleter.Complete()) {
+                    _NickCompleter = null;
+                    return;
+                }
             }
 
             int newPosition;

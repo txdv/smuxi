@@ -31,8 +31,11 @@ namespace Smuxi.Frontend
         private static readonly log4net.ILog _Logger = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 #endif
 
-        protected bool TwitterPrefix { get; set; }
-        protected bool FirstWord     { get; set; }
+        public string Text     { get; set; }
+        public int    Position { get; set; }
+
+        protected bool NickPrefix { get; set; }
+        protected bool FirstWord  { get; set; }
 
         protected string Prefix  { get; set; }
         protected string Infix   { get; set; }
@@ -47,7 +50,7 @@ namespace Smuxi.Frontend
 
         protected string CompletionChar {
             get {
-                if (TwitterPrefix) {
+                if (NickPrefix) {
                     return string.Empty;
                 } else {
                     return (string)UserConfig["Interface/Entry/CompletionCharacter"];
@@ -110,25 +113,33 @@ namespace Smuxi.Frontend
         public NickCompleter(IChatView chatView, UserConfig userConfig, string text, int position)
         {
             ChatView = chatView;
+            UserConfig = userConfig;
+            Text = text;
+            Position = position;
+        }
+
+        public bool Complete()
+        {
             ChatModel chat = ChatView.ChatModel;
+            string text = Text;
+            int position = Position;
 
             // return if we don't support the current ChatView
             if (!(chat is GroupChatModel) &&
                 !(chat is PersonChatModel)) {
-                return;
+                return false;
             }
 
             // we have no word to read
             if (position == 0) {
-                return;
+                return false;
             }
 
             // we are pointing at space, do nothing!
             if (text[position - 1] == ' ') {
-                return;
+                return false;
             }
 
-            UserConfig = userConfig;
 
             int start;
             Infix = CurrentWord(text, position, out start);
@@ -136,7 +147,7 @@ namespace Smuxi.Frontend
             FirstWord = (start == 0);
 
             if (Infix.StartsWith("@")) {
-                TwitterPrefix = true;
+                NickPrefix = true;
                 Infix = Infix.Substring(1);
             }
 
@@ -158,15 +169,19 @@ namespace Smuxi.Frontend
                 foreach (var res in Results) {
                     _Logger.Debug("Completion results: " + res);
                 }
+
+                return true;
 #endif
             } else {
                 PersonModel person = (chat as PersonChatModel).Person;
 
                 if (person.IdentityName.StartsWith(Infix, StringComparison.InvariantCultureIgnoreCase)) {
                     Results = new string[] { person.IdentityName };
+                    return true;
+                } else {
+                    return false;
                 }
             }
-
         }
 
         private string CurrentWord(string word, int position, out int start)
@@ -207,7 +222,7 @@ namespace Smuxi.Frontend
                 return null;
             } else {
 
-                string ret = Prefix + (TwitterPrefix ? "@" : "");
+                string ret = Prefix + (NickPrefix ? "@" : "");
                 if (CurrentResult >= SortedResults.Count) {
                     ret += Infix;
                     CurrentResult = 0;
