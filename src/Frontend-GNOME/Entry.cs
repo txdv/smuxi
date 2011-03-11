@@ -46,7 +46,8 @@ namespace Smuxi.Frontend.Gnome
         private bool             _HistoryChangedLine;
         private Notebook         _Notebook;
         private CommandManager   _CommandManager;
-        private NickCompleter    _NickCompleter = null;
+
+        private IEnumerator<NickCompletionResult> _NickCompleter = null;
 
         /*
         public StringCollection History {
@@ -646,24 +647,21 @@ namespace Smuxi.Frontend.Gnome
             _Notebook.CurrentChatView.Clear();
         }
 
-        private void _NickCompletion(ref NickCompleter _NickCompleter)
+        private void _NickCompletion(ref IEnumerator<NickCompletionResult> _NickCompleter)
         {
             if (_NickCompleter == null) {
-                _NickCompleter = new NickCompleter(_Notebook.CurrentChatView,
-                                                   Frontend.UserConfig, Text, Position);
-
-                if (!_NickCompleter.Complete()) {
-                    _NickCompleter = null;
-                    return;
-                }
+                _NickCompleter = NickCompleter.Enumerator(_Notebook.CurrentChatView,
+                                                          Frontend.UserConfig, Text, Position);
+            }
+            
+            var b = _NickCompleter.MoveNext();
+            _Logger.Debug(b);
+            if (b) {
+                var res = _NickCompleter.Current;
+                Text = res.Text;
+                Position = res.Position;
             }
 
-            int newPosition;
-            string text = _NickCompleter.Next(out newPosition);
-            if (text != null) {
-                Text = text;
-                Position = newPosition;
-            }
         }
         
         public virtual void ApplyConfig(UserConfig config)

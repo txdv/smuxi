@@ -22,14 +22,22 @@ using System;
 using System.Collections.Generic;
 using Smuxi.Common;
 using Smuxi.Engine;
+using System.Collections;
 
 namespace Smuxi.Frontend
 {
-    public class NickCompleter
+    public class NickCompleter: IEnumerable<NickCompletionResult>
     {
 #if LOG4NET
         private static readonly log4net.ILog _Logger = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
 #endif
+
+        public static IEnumerator<NickCompletionResult> Enumerator(IChatView chatView, UserConfig userConfig, string text, int position)
+        {
+            var completer = new NickCompleter(chatView, userConfig, text, position);
+
+            return completer.GetEnumerator();
+        }
 
         public string Text     { get; set; }
         public int    Position { get; set; }
@@ -118,7 +126,7 @@ namespace Smuxi.Frontend
             Position = position;
         }
 
-        public bool Complete()
+        private bool Complete()
         {
             ChatModel chat = ChatView.ChatModel;
             string text = Text;
@@ -198,9 +206,9 @@ namespace Smuxi.Frontend
             return word.Substring(start, end - start);
         }
 
-        public string Next(out int newPosition)
+        private NickCompletionResult Next()
         {
-            newPosition = 0;
+            int newPosition = 0;
             if (Results == null) {
                 return null;
             }
@@ -233,9 +241,32 @@ namespace Smuxi.Frontend
     
                 newPosition = ret.Length;
                 ret += Postfix;
-    
-                return ret;
+
+                return new NickCompletionResult(ret, newPosition);
             }
         }
+
+        #region IEnumerable[NickCompleterEnumerator] implementation
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return (IEnumerator)GetEnumerator();
+        }
+
+        public IEnumerator<NickCompletionResult> GetEnumerator()
+        {
+            if (!Complete()) {
+                yield break;
+            }
+
+            while (true) {
+                var next = Next();
+                if (next == null) {
+                    yield break;
+                } else {
+                    yield return next;
+                }
+            }
+        }
+        #endregion
     }
 }
